@@ -57,13 +57,13 @@ function asDecPercent(currentXP, nextLevelXP)
 end
 
 function dotLevel(level, xp, lxp)
-    if level == nil then
+    if level == nil or level == 0 then
         return nil
     end
     if xp == nil then
         return nil
     end
-    if lxp == nil then
+    if lxp == nil or lxp == 0 then
         return nil
     end
     return level + xp / lxp
@@ -133,32 +133,42 @@ function events:UNIT_HEALTH(...)
     end
 end
 
+function copySaveToCurrent()
+    lowscore.health = NearDeathExperienceScores.health
+    lowscore.maxhp = NearDeathExperienceScores.maxhp
+    lowscore.level = NearDeathExperienceScores.level
+    lowscore.xp = NearDeathExperienceScores.xp
+    lowscore.lxp = NearDeathExperienceScores.lxp
+end
+
 function events:PLAYER_ENTERING_WORLD(...)
+    validateNDE()
+    copySaveToCurrent()
     displayScore()
+end
+
+function validateNDE()
+    local savedDotlevel = dotLevel(NearDeathExperienceScores.level, NearDeathExperienceScores.xp,
+        NearDeathExperienceScores.lxp)
+    if savedDotlevel ~= nil then
+        local currentDotlevel = dotLevel(UnitLevel("player"), UnitXP("player"), UnitXPMax("player"))
+        if currentDotlevel ~= nil and savedDotlevel > currentDotlevel then
+            NearDeathExperienceScores = {
+                level = nil,
+                xp = nil,
+                lxp = nil,
+                health = nil,
+                maxhp = nil
+            }
+        end
+    end
 end
 
 function events:ADDON_LOADED(...)
     local addon = ...
     if addon == "NearDeathExperience" then
-        local nde_dotlevel = dotLevel(NearDeathExperienceScores.level, NearDeathExperienceScores.xp,
-            NearDeathExperienceScores.lxp)
-        if nde_dotlevel ~= nil then
-            local csv_dotlevel = dotLevel(UnitLevel("player"), UnitXP("player"), UnitXPMax("player"))
-            if nde_dotlevel > csv_dotlevel then
-                NearDeathExperienceScores = {
-                    level = nil,
-                    xp = nil,
-                    lxp = nil,
-                    health = nil,
-                    maxhp = nil
-                }
-            end
-        end
-        lowscore.health = NearDeathExperienceScores.health
-        lowscore.maxhp = NearDeathExperienceScores.maxhp
-        lowscore.level = NearDeathExperienceScores.level
-        lowscore.xp = NearDeathExperienceScores.xp
-        lowscore.lxp = NearDeathExperienceScores.lxp
+        validateNDE()
+        copySaveToCurrent()
         displayScore()
     end
 end
@@ -186,7 +196,6 @@ frame:SetScript("OnMouseUp", function(self, button)
             y = 0
         }
         mouseEnd.x, mouseEnd.y = self:GetCenter()
-
         local delta_x = mouseStart.x - mouseEnd.x
         local delta_y = mouseStart.y - mouseEnd.y
         if (delta_x * delta_x + delta_y * delta_y) < clickDistanceTreshold * clickDistanceTreshold then
