@@ -1,6 +1,0 @@
-## Interface: 11404
-## Title: Near Death Experience 0.0.1
-## Author: Hagen Vingard
-## SavedVariablesPerCharacter: NearDeathExperienceScores
-
-main.lua
