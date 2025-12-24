@@ -42,12 +42,6 @@ highscore:SetJustifyH("CENTER")
 local fontPath, _, flags = highscore:GetFont()
 highscore:SetFont(fontPath, 18, flags)
 
-testscore:SetTextColor(1, 1, 1, 1)
-testscore:SetPoint("CENTER", frame, 0, -10)
-testscore:SetJustifyH("CENTER")
-local fontPath, _, flags = testscore:GetFont()
-testscore:SetFont(fontPath, 16, flags)
-
 function asDecPercent(currentXP, nextLevelXP)
     local roundPercent = math.floor(currentXP / nextLevelXP * 100 + .5)
     if roundPercent > 99 then
@@ -70,11 +64,6 @@ function dotLevel(level, xp, lxp)
 end
 
 function displayScore()
-    if testInCombat == true and test.level ~= nil then
-        testscore:SetText(string.format("%.1f", math.floor(test.health / test.maxhp * 1000 + .5) / 10) .. "%")
-    elseif testInCombat == false then
-        testscore:SetText("")
-    end
     if (lowscore.level ~= nil) then
         local scoreLine = ""
         if displayTitleStatus == 0 then
