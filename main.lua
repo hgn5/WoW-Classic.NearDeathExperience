@@ -122,6 +122,7 @@ end
 function events:PLAYER_REGEN_ENABLED()
     testInCombat = false
     if not UnitIsDead("player") then
+        test.timestamp = time()
         NDE.helperFunctions:addEntry(NearDeathExperienceScores, test)
 
         NearDeathExperienceScores.lastCombat = test
@@ -148,11 +149,23 @@ local function formatedChatEntry(score, name)
     if name == nil then
         name = "Entry"
     end
-   print("|cffFF8888[NDE]|r |cffFFff00"..name..":|r " ..
+    if score == nil then
+        print("|cffFF8888[NDE]|r |cffFFff00"..name..":|r no score data")
+        return
+    end
+
+    local timeString = ""
+    if score.timestamp ~= nil then
+        timeString = date("%Y-%m-%d %H:%M", score.timestamp)
+    else
+        timeString = "some time ago"
+    end
+
+    print("|cffFF8888[NDE]|r |cffFFff00"..name..":|r " ..
               string.format("%.1f", math.floor(score.health / score.maxhp * 1000 + .5) / 10) .. "%" ..
               " HP @ Lvl " ..
               string.format("%.2f", NDE.helperFunctions:dotLevel(score.level, score.xp, score.lxp)) .."|r |cffcccccc@ " ..    
-              date("%Y-%m-%d %H:%M", score.timestamp) .."|r")
+              timeString .."|r")
 end
 
 function events:PLAYER_ENTERING_WORLD(...)
@@ -179,7 +192,7 @@ function validateNDE()
         NearDeathExperienceScores.lastCombat.level,
         NearDeathExperienceScores.lastCombat.xp,
         NearDeathExperienceScores.lastCombat.lxp)
-        
+
     if savedDotlevel ~= nil then
         local currentDotlevel = NDE.helperFunctions:dotLevel(UnitLevel("player"), UnitXP("player"), UnitXPMax("player"))
         if currentDotlevel ~= nil and savedDotlevel > currentDotlevel then
@@ -193,6 +206,14 @@ function validateNDE()
 end
 
 local function updateTopList()
+
+    if NearDeathExperienceScores == nil or
+       NearDeathExperienceScores.entries == nil or
+       #NearDeathExperienceScores.entries == 0 then
+        topListFrame:Hide()
+        return
+    end
+
     local topListIndexes = ""
     local topListHP = ""
     local topListLvllabel = ""
@@ -200,7 +221,7 @@ local function updateTopList()
     local topListTime = ""
 
     for i, entry in ipairs(NearDeathExperienceScores.entries) do
-        topListIndexes = topListIndexes ..  i .. ".\n"
+        topListIndexes = topListIndexes ..  i .. ". \n"
         topListHP = topListHP .. string.format("%.1f", math.floor(entry.health / entry.maxhp * 1000 + .5) / 10) .. "% HP\n"
 
         if NearDeathExperienceSetup.displayTitleStatus < 2 then
@@ -209,7 +230,11 @@ local function updateTopList()
         end
 
         if NearDeathExperienceSetup.displayTitleStatus == 0 then
-            topListTime = topListTime .. date("%Y-%m-%d %H:%M", entry.timestamp) .."\n"
+            if entry.timestamp ~= nil then
+                topListTime = topListTime .. " ".. date("%Y-%m-%d %H:%M", entry.timestamp) .."\n"
+            else
+                topListTime = topListTime .. " some time ago\n"
+            end
         end
     end
 

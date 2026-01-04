@@ -102,7 +102,7 @@ function NDE.helperFunctions:addEntry(scores, data)
         lxp = data.lxp,
         health = data.health,
         maxhp = data.maxhp,
-        timestamp = time(),
+        timestamp = data.timestamp or nil,
     })
 
     -- sort by lowest health percentage
