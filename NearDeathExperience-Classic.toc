@@ -1,9 +1,15 @@
 ## Interface: 11508
-## Title: Near Death Experience 0.0.3
-## Version: 0.0.3
+## Title: Near Death Experience |cff66ccffv0.1.1|r
+## Version: 0.1.1
 ## Author: Hagen Vingard
-## SavedVariablesPerCharacter: NearDeathExperienceScores, NearDeathExperienceSetup
+## SavedVariablesPerCharacter: NearDeathExperienceScores, NearDeathExperienceSetup, NearDeathExperienceSessionScores
 
-helper-functions.lua
-display-functions.lua
+colors.lua
+helper.lua
+display.lua
+options.lua
+animations.lua
+gametooltip.lua
+buffs.lua
+toplist.lua
 main.lua

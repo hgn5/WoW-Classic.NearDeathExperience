@@ -1,346 +1,541 @@
+local ADDON = ...
+
 NDE = NDE or {}
-NDE.helperFunctions = NDE.helperFunctions or {}
-NDE.displayFunctions = NDE.displayFunctions or {}
-
-local events = {}
-local lowscore = NDE.helperFunctions:createEmptyEntry()
-local test = NDE.helperFunctions:createEmptyEntry()
-
-local mainTextFontSize = 18
-local toplistFontSize = 12
-
-local testInCombat = nil
-local displayTitleStatus = 0
-
-local frame = CreateFrame("Frame", "NearDeathExperience_Lowscore", UIParent, "BackdropTemplate")
-frame:SetFrameStrata("DIALOG")
-frame:SetWidth(400)
-frame:SetHeight(40)
-frame:SetPoint("CENTER", 0, 100)
-frame:SetMovable(true)
-frame:EnableMouse(true)
-
-frame:SetBackdrop({
-    bgFile   = "Interface\\Tooltips\\UI-Tooltip-Background",
-    edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-    tile     = true,
-    tileSize = 16,
-    edgeSize = 12,
-    insets   = { left = 3, right = 3, top = 3, bottom = 3 },
-})
-frame:SetBackdropColor(0, 0, 0, 0.5)
-frame:SetBackdropBorderColor(.25, .25, .25, .5)
-
-
-local highscore = frame:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
-highscore:SetTextColor(1, 1, .5, 1)
-highscore:SetPoint("CENTER", frame, 0, 0)
-highscore:SetJustifyH("CENTER")
-local fontPath, _, flags = highscore:GetFont()
-highscore:SetFont(fontPath, mainTextFontSize, flags)
-
-local topListFrame = CreateFrame("Frame", "NearDeathExperience_TopList", frame, "BackdropTemplate")
-topListFrame:SetWidth(400)
-topListFrame:SetHeight(1)
-topListFrame:SetPoint("TOPRIGHT", 0, - highscore:GetHeight())
-
-topListFrame:SetBackdrop({
-    bgFile   = "Interface\\Tooltips\\UI-Tooltip-Background",
-    edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-    tile     = true,
-    tileSize = 16,
-    edgeSize = 12,
-    insets   = { left = 3, right = 3, top = 3, bottom = 3 },
-})
-
-topListFrame:SetBackdropColor(0, 0, 0, 0.7)
-topListFrame:SetBackdropBorderColor(1, 1, 1, 1)
-topListFrame:Hide()
-
-local topListText_indexes = topListFrame:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
-topListText_indexes:SetTextColor(.7, .7, .7, 1)
-topListText_indexes:SetPoint("TOPRIGHT", topListFrame, -10, -10)
-topListText_indexes:SetJustifyH("RIGHT")
-local fontPath, _, flags = topListText_indexes:GetFont()
-topListText_indexes:SetFont(fontPath, toplistFontSize, flags)
-
-local topListText_HP = topListFrame:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
-topListText_HP:SetTextColor(1, 1, .5, 1)
-topListText_HP:SetPoint("TOPRIGHT", topListFrame, -10, -10)
-topListText_HP:SetJustifyH("RIGHT")
-local fontPath, _, flags = topListText_HP:GetFont()
-topListText_HP:SetFont(fontPath, toplistFontSize, flags)
-
-local topListText_Lvllabel = topListFrame:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
-topListText_Lvllabel:SetTextColor(1, 1, 1, 1)
-topListText_Lvllabel:SetPoint("TOPRIGHT", topListFrame, -10, -10)
-topListText_Lvllabel:SetJustifyH("RIGHT")
-local fontPath, _, flags = topListText_Lvllabel:GetFont()
-topListText_Lvllabel:SetFont(fontPath, toplistFontSize, flags)
-
-local topListText_Lvl = topListFrame:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
-topListText_Lvl:SetTextColor(1, 1, 1, 1)
-topListText_Lvl:SetPoint("TOPRIGHT", topListFrame, -10, -10)
-topListText_Lvl:SetJustifyH("RIGHT")
-local fontPath, _, flags = topListText_Lvl:GetFont()
-topListText_Lvl:SetFont(fontPath, toplistFontSize, flags)
-
-local topListText_time = topListFrame:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
-topListText_time:SetTextColor(.7, .7, .7, 1)
-topListText_time:SetPoint("TOPRIGHT", topListFrame, -10, -10)
-topListText_time:SetJustifyH("RIGHT")
-local fontPath, _, flags = topListText_time:GetFont()
-topListText_time:SetFont(fontPath, toplistFontSize, flags)
+NDE.helper = NDE.helper or {}
+NDE.display = NDE.display or {}
+NDE.options = NDE.options or {}
+NDE.colors = NDE.colors or {}
+NDE.animations = NDE.animations or {}
+NDE.animations.icon = NDE.animations.icon or {}
+NDE.gametooltip = NDE.gametooltip or {}
+NDE.buffs = NDE.buffs or {}
+NDE.topList = NDE.topList or {}
 
 NearDeathExperienceSetup = NearDeathExperienceSetup or {}
-NearDeathExperienceSetup.displayTitleStatus = NearDeathExperienceSetup.displayTitleStatus or 0
+NearDeathExperienceScores = NearDeathExperienceScores or {}
+NearDeathExperienceSessionScores = NearDeathExperienceSessionScores or {}
 
-function displayScore(score)
+NDE.isFloating = false
+
+local test = NDE.helper:createEmptyEntry()
+local toplistFontSize = 12
+local testInCombat = nil
+
+-- Icon display code for best score and tooltip --
+local floatingIconContainer = CreateFrame("Frame", "NDE_FloatingIconContainer", UIParent)
+floatingIconContainer:SetFrameStrata("LOW")
+floatingIconContainer:EnableMouse(true)
+floatingIconContainer:SetMovable(true)
+floatingIconContainer:SetSize(32, 32)
+floatingIconContainer:SetPoint("CENTER", 0, 0)
+floatingIconContainer:Hide()
+
+-- Create icon frame
+local iconFrame = CreateFrame("Button", "NDE_IconFrame", UIParent, "BackdropTemplate")
+iconFrame:SetFrameStrata("MEDIUM")
+iconFrame:SetSize(32, 30)
+iconFrame:SetPoint("CENTER", 0, 0)
+iconFrame:SetFrameLevel(BuffFrame:GetFrameLevel())
+iconFrame:EnableMouse(true)
+
+-- Icon texture
+iconFrame.icon = iconFrame:CreateTexture(nil, "BACKGROUND")
+iconFrame.icon:SetAllPoints(iconFrame)
+iconFrame.icon:SetTexture(136147) -- resurrection sickness icon
+
+iconFrame.border = iconFrame:CreateTexture(nil, "BORDER")
+iconFrame.border:ClearAllPoints()
+iconFrame.border:SetAllPoints(iconFrame)
+iconFrame.border:SetPoint("TOPLEFT", iconFrame, "TOPLEFT", 0, 0)
+iconFrame.border:SetPoint("BOTTOMRIGHT", iconFrame, "BOTTOMRIGHT", 0, 1)
+iconFrame.border:SetTexture("Interface\\Buttons\\UI-Debuff-Overlays")
+iconFrame.border:SetTexCoord(0.296875, 0.5703125, 0, 0.515625)
+iconFrame.border:SetVertexColor(1, 1, 1, 1)
+iconFrame.border:SetBlendMode("ADD")
+
+-- Title text in icon
+iconFrame.title = iconFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+iconFrame.title:SetPoint("BOTTOM", iconFrame, "BOTTOM",1, 2)
+iconFrame.title:SetText("NDE")
+local fontPath, _, flags = iconFrame.title:GetFont()
+iconFrame.title:SetFont(fontPath, 10, flags)
+iconFrame.title:SetTextColor(1, .8, .2, 1)
+
+-- Percent text below
+iconFrame.score = iconFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+iconFrame.score:SetPoint("TOP", iconFrame, "BOTTOM", 0, -2)
+iconFrame.score:SetText("--")
+iconFrame.score:SetFont(fontPath, 10, flags)
+iconFrame.score:SetTextColor(1, .8, .2, 1)
+iconFrame.score:SetJustifyH("CENTER")
+
+function NDE:updateIcon(score)
+    iconFrame.score:SetText(NDE.helper:formatP100(score))
+    local r, g, b, a = NDE.colors.p100:RGBA(score)
+    iconFrame.score:SetTextColor(r, g, b, a)
+    if iconFrame.border then 
+        iconFrame.border:SetVertexColor(r, g, b, a)
+    end
+end
+
+iconFrame:SetScript("OnEnter", function(self)
+    NDE.gametooltip:setGameTooltip(self, 14)
+end)
+
+iconFrame:SetScript("OnLeave", function(self)
+    GameTooltip:Hide()
+end)
+
+local isDragging = false
+
+iconFrame:SetScript("OnMouseDown", function(self, button)
+    if button == "LeftButton" and IsControlKeyDown() and iconFrame.isMovable == true then
+        isDragging = true
+        floatingIconContainer:StartMoving()
+    end
+end)
+
+iconFrame:SetScript("OnMouseUp", function(self, button)
+    if isDragging then
+        floatingIconContainer:StopMovingOrSizing()
+        isDragging = false
+        return
+    end
+
+    if button == "LeftButton" then
+        if NDE.topList.frame:IsShown() then
+            NDE.topList.frame:Hide()
+            return
+        end
+        NDE.topList:updateTopList()
+        NDE.topList.frame:Show()
+
+    elseif button == "RightButton" then
+        local catID = NDE.options:updateOptionsScreen()
+        Settings.OpenToCategory(catID)
+
+    end
+end)
+
+-- Main display text frame for low scores --
+local textDisplay = CreateFrame("Frame", "NearDeathExperience_Lowscore", UIParent, "BackdropTemplate")
+textDisplay:SetFrameStrata("DIALOG")
+textDisplay:SetWidth(400)
+textDisplay:SetHeight(40)
+textDisplay:SetPoint("TOP", 0, -72)
+textDisplay:SetMovable(true)
+textDisplay:EnableMouse(true)
+
+textDisplay:SetBackdrop({
+    bgFile   = "Interface\\Tooltips\\UI-Tooltip-Background",
+    edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+    tile     = true,
+    tileSize = 16,
+    edgeSize = 12,
+    insets   = { left = 3, right = 3, top = 3, bottom = 3 },
+})
+textDisplay:SetBackdropColor(0, 0, 0, 0.5)
+textDisplay:SetBackdropBorderColor(.25, .25, .25, .5)
+
+local highscore = textDisplay:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+highscore:SetTextColor(1, 1, .5, 1)
+highscore:SetPoint("CENTER", textDisplay, 0, 0)
+highscore:SetJustifyH("CENTER")
+local fontPath, _, flags = highscore:GetFont()
+highscore:SetFont(fontPath, NearDeathExperienceSetup.textSize or 18, flags)
+
+local topList = CreateFrame("Frame", "NearDeathExperience_TopList", UIParent, "BackdropTemplate")
+topList:SetWidth(400)
+topList:SetHeight(100)
+topList:SetBackdrop({
+    bgFile   = "Interface\\Tooltips\\UI-Tooltip-Background",
+    edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+    tile     = true,
+    tileSize = 16,
+    edgeSize = 12,
+    insets   = { left = 3, right = 3, top = 3, bottom = 3 },
+})
+
+topList:SetBackdropColor(0, 0, 0, 0.7)
+topList:SetBackdropBorderColor(1, 1, 1, 1)
+topList:Hide()
+
+topList.indexes = topList:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+topList.indexes:SetTextColor(.7, .7, .7, 1)
+topList.indexes:SetPoint("TOPRIGHT", topList, -10, -10)
+topList.indexes:SetJustifyH("RIGHT")
+local fontPath, _, flags = topList.indexes:GetFont()
+topList.indexes:SetFont(fontPath, toplistFontSize, flags)
+
+topList.HP = topList:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+topList.HP:SetTextColor(1, 1, .5, 1)
+topList.HP:SetPoint("TOPRIGHT", topList, -10, -10)
+topList.HP:SetJustifyH("RIGHT")
+local fontPath, _, flags = topList.HP:GetFont()
+topList.HP:SetFont(fontPath, toplistFontSize, flags)
+
+topList.Lvllabel = topList:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+topList.Lvllabel:SetTextColor(1, 1, 1, 1)
+topList.Lvllabel:SetPoint("TOPRIGHT", topList, -10, -10)
+topList.Lvllabel:SetJustifyH("RIGHT")
+local fontPath, _, flags = topList.Lvllabel:GetFont()
+topList.Lvllabel:SetFont(fontPath, toplistFontSize, flags)
+
+topList.Lvl = topList:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+topList.Lvl:SetTextColor(1, 1, 1, 1)
+topList.Lvl:SetPoint("TOPRIGHT", topList, -10, -10)
+topList.Lvl:SetJustifyH("RIGHT")
+local fontPath, _, flags = topList.Lvl:GetFont()
+topList.Lvl:SetFont(fontPath, toplistFontSize, flags)
+
+topList.times = topList:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+topList.times:SetTextColor(.7, .7, .7, 1)
+topList.times:SetPoint("TOPRIGHT", topList, -10, -10)
+topList.times:SetJustifyH("RIGHT")
+local fontPath, _, flags = topList.times:GetFont()
+topList.times:SetFont(fontPath, toplistFontSize, flags)
+
+function NDE:setTextBgOpacity()
+    local opacity = NearDeathExperienceSetup.textBgOpacity or 0.5
+    textDisplay:SetBackdropColor(0, 0, 0, opacity)
+    textDisplay:SetBackdropBorderColor(.25, .25, .25, opacity)
+end
+
+function NDE:updateDisplayText()
+    if highscore == nil then
+        return
+    end
+    local fontPath, _, flags = highscore:GetFont()
+    highscore:SetFont(fontPath, NearDeathExperienceSetup.textSize, flags)
+    textDisplay:SetWidth(highscore:GetStringWidth() + NearDeathExperienceSetup.textSize / 2)
+    textDisplay:SetHeight(highscore:GetStringHeight() + NearDeathExperienceSetup.textSize / 2)
+end
+
+function NDE:displayScore(score)
     if (score ~= nil and score.level ~= nil) then
-        local scoreLine = ""
-        if NearDeathExperienceSetup.displayTitleStatus == 0 then
-            highscore:SetText(NDE.displayFunctions:full(score))
+        local displayFunction = NDE.display:getDisplayFunctionName()
+        if NDE.display.textStyles[displayFunction] == nil then
+            textDisplay:Hide()
+            return
         end
-        if NearDeathExperienceSetup.displayTitleStatus == 1 then
-            highscore:SetText(NDE.displayFunctions:mini(score))
-        end
-        if NearDeathExperienceSetup.displayTitleStatus == 2 then
-            highscore:SetText(NDE.displayFunctions:nano(score))
-        end
+        highscore:SetText(NDE.display.textStyles[displayFunction](score))
     else
-        highscore:SetText(NDE.displayFunctions:noScoreYet())
+        highscore:SetText(NDE.display.textStyles:noScoreYet())
     end
-    frame:SetWidth(highscore:GetStringWidth() + 20)
-    frame:SetHeight(highscore:GetStringHeight() + 10)
+    NDE:updateDisplayText()
+    textDisplay:Show()
 end
 
-function events:PLAYER_REGEN_DISABLED()
-    test = NDE.helperFunctions:sampleValues()
-    testInCombat = true
-end
+function NDE:AnchorNDEIcon()
 
-function events:PLAYER_REGEN_ENABLED()
-    testInCombat = false
-    if not UnitIsDead("player") then
-        test.timestamp = time()
-        NDE.helperFunctions:addEntry(NearDeathExperienceScores, test)
-
-        NearDeathExperienceScores.lastCombat = test
-        -- formatedChatEntry(test, "Last Combat")
-
-        local lowscore = NDE.helperFunctions:getLowestEntry(NearDeathExperienceScores)
-        if (lowscore.health / lowscore.maxhp) > (test.health / test.maxhp) then
-            formatedChatEntry(test, "new Lowscore")
-        end
-        displayScore(lowscore)
-    end
-end
-
-function events:UNIT_HEALTH(...)
-    local unit = ...
-    if testInCombat == true and unit == "player" then
-        if test.health == nil or (UnitHealth("player") / UnitHealthMax("player")) < (test.health / test.maxhp) then
-           test = NDE.helperFunctions:sampleValues()
-        end
-    end
-end
-
-local function formatedChatEntry(score, name)
-    if name == nil then
-        name = "Entry"
-    end
-    if score == nil then
-        print("|cffFF8888[NDE]|r |cffFFff00"..name..":|r no score data")
+    if NearDeathExperienceSetup.displayFunction == "buff" 
+        or NearDeathExperienceSetup.displayFunction == "debuff"
+        or NearDeathExperienceSetup.displayFunction == "floating"
+    then
+        textDisplay:Hide()
+        iconFrame:Show()
+    else
+        textDisplay:Show()
+        iconFrame:Hide()
         return
     end
 
-    local timeString = ""
-    if score.timestamp ~= nil then
-        timeString = date("%Y-%m-%d %H:%M", score.timestamp)
-    else
-        timeString = "some time ago"
+    local anchor = nil
+    if NearDeathExperienceSetup.displayFunction == "buff" then
+        anchor = NDE.buffs:getLastVisibleBuff()
+
+    elseif NearDeathExperienceSetup.displayFunction == "debuff" then
+        anchor = NDE.buffs:getLastVisibleDebuff()
+
     end
 
-    print("|cffFF8888[NDE]|r |cffFFff00"..name..":|r " ..
-              string.format("%.1f", math.floor(score.health / score.maxhp * 1000 + .5) / 10) .. "%" ..
-              " HP @ Lvl " ..
-              string.format("%.2f", NDE.helperFunctions:dotLevel(score.level, score.xp, score.lxp)) .."|r |cffcccccc@ " ..    
-              timeString .."|r")
-end
+    iconFrame:ClearAllPoints()
+    iconFrame.score:ClearAllPoints()
+    iconFrame.score:SetPoint("TOP", iconFrame, "BOTTOM", 0, -2)
 
-function events:PLAYER_ENTERING_WORLD(...)
-    validateNDE()
+    if anchor then
+        iconFrame:SetSize(anchor:GetWidth(), anchor:GetHeight())
+        iconFrame:SetPoint("TOPRIGHT", anchor, "TOPLEFT", -6, 0)
+        floatingIconContainer:Hide()
 
-    print("|cffFF8888[NDE]|r |cff00ff00hover|r to display the top 10 low scores.")
-    print("|cffFF8888[NDE]|r Hold |cff00ff00CTRL|r and |cff00ff00drag|r to move the display.")
-    print("|cffFF8888[NDE]|r Hold |cff00ff00ALT|r and |cff00ff00click|r the display to change info shown.")
+    elseif NearDeathExperienceSetup.displayFunction == "buff" then
+        iconFrame:SetPoint("TOPRIGHT", BuffFrame, "TOPRIGHT", 0, 0)
+        floatingIconContainer:Hide()
 
-    local lowscore = NDE.helperFunctions:getLowestEntry(NearDeathExperienceScores)
-    formatedChatEntry(lowscore, "Lowscore")
-    displayScore(lowscore)
-end
+    elseif NearDeathExperienceSetup.displayFunction == "debuff" then
+        iconFrame:SetPoint("TOPRIGHT", BuffFrame, "BOTTOMRIGHT", 0, -64)
+        floatingIconContainer:Hide()
 
-function validateNDE()
-    NearDeathExperienceScores = NDE.helperFunctions:repairScoresTable(NearDeathExperienceScores)
-    NDE.helperFunctions:printEntries(NearDeathExperienceScores)
-
-    if NearDeathExperienceScores.lastCombat == nil then
-        return
-    end
-
-    local savedDotlevel = NDE.helperFunctions:dotLevel(
-        NearDeathExperienceScores.lastCombat.level,
-        NearDeathExperienceScores.lastCombat.xp,
-        NearDeathExperienceScores.lastCombat.lxp)
-
-    if savedDotlevel ~= nil then
-        local currentDotlevel = NDE.helperFunctions:dotLevel(UnitLevel("player"), UnitXP("player"), UnitXPMax("player"))
-        if currentDotlevel ~= nil and savedDotlevel > currentDotlevel then
-            NearDeathExperienceScores = {
-                entries = {},
-                maxEntries = 10
-            }
+    elseif NearDeathExperienceSetup.displayFunction == "floating" then
+        iconFrame:SetPoint("CENTER", floatingIconContainer, "CENTER", 0, 0)
+        floatingIconContainer:Show()
+        if NearDeathExperienceSetup.iconTextAbove == true then
+            iconFrame.score:ClearAllPoints()
+            iconFrame.score:SetPoint("BOTTOM", iconFrame, "TOP", 0, 2)
         end
     end
+
+    iconFrame.isMovable = NearDeathExperienceSetup.displayFunction == "floating"
+    NDE.isFloating = NearDeathExperienceSetup.displayFunction == "floating" or 
+        NearDeathExperienceSetup.displayFunction == "full" or 
+        NearDeathExperienceSetup.displayFunction == "mini" or 
+        NearDeathExperienceSetup.displayFunction == "nano" or 
+        NearDeathExperienceSetup.displayFunction == "small"
 
 end
 
 local function updateTopList()
 
     if NearDeathExperienceScores == nil or
-       NearDeathExperienceScores.entries == nil or
-       #NearDeathExperienceScores.entries == 0 then
-        topListFrame:Hide()
+        NearDeathExperienceScores.entries == nil or
+        #NearDeathExperienceScores.entries == 0 then
+        topList:Hide()
         return
     end
 
-    local topListIndexes = ""
-    local topListHP = ""
-    local topListLvllabel = ""
-    local topListLvl = ""
-    local topListTime = ""
+    local topListIndexes = "\n"
+    local topListHP = "HP\n"
+    local topListLvllabel = "\n"
+    local topListLvl = "Level\n"
+    local topListTime = "Date/Time\n"
+
+    local widths = {}
+
+    topList.contentArea = topList.contentArea or CreateFrame("Frame", nil, topList)
+    topList.contentArea:ClearAllPoints()
+    topList.contentArea:SetPoint("TOPLEFT", topList, "TOPLEFT", 10, -10)
+    topList.contentArea:SetPoint("BOTTOMRIGHT", topList, "BOTTOMRIGHT", -10, 10)
+
+    topList.title = topList:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+    topList.title:SetTextColor(1, .8, .2, 1)
+    topList.title:SetPoint("TOPLEFT", topList.contentArea, "TOPLEFT", 0, 0)
+    topList.title:SetJustifyH("LEFT")
+    local fontPath, _, flags = topList.title:GetFont()
+    topList.title:SetFont(fontPath, toplistFontSize + 2, flags)
+    topList.title:SetText("Near Death Experience")
+    table.insert(widths, topList.title:GetStringWidth())
+
+    topList.subtitle = topList:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    topList.subtitle:SetTextColor(1, 1, 1, 1)
+    topList.subtitle:SetPoint("TOPLEFT", topList.title, "BOTTOMLEFT", 0, -5)
+    topList.subtitle:SetJustifyH("LEFT")
+    local fontPath, _, flags = topList.subtitle:GetFont()
+    topList.subtitle:SetFont(fontPath, toplistFontSize, flags)
+    topList.subtitle:SetText("Top " ..  math.min(#NearDeathExperienceScores.entries, NearDeathExperienceScores.maxEntries) .. " Low Scores")
+    table.insert(widths, topList.subtitle:GetStringWidth())
 
     for i, entry in ipairs(NearDeathExperienceScores.entries) do
-        topListIndexes = topListIndexes ..  i .. ". \n"
-        topListHP = topListHP .. string.format("%.1f", math.floor(entry.health / entry.maxhp * 1000 + .5) / 10) .. "% HP\n"
+        topListIndexes = topListIndexes .. i .. ". \n"
+        topListHP = topListHP ..
+            NDE.helper:formatP100(entry.health / entry.maxhp * 100) .. "% HP\n"
 
         if NearDeathExperienceSetup.displayTitleStatus < 2 then
             topListLvllabel = topListLvllabel .. "@ Lvl\n"
-            topListLvl = topListLvl .. string.format("%.2f", NDE.helperFunctions:dotLevel(entry.level, entry.xp, entry.lxp)) .."\n"
+            topListLvl = topListLvl ..
+                string.format("%.2f", NDE.helper:dotLevel(entry.level, entry.xp, entry.lxp)) .. "\n"
         end
 
         if NearDeathExperienceSetup.displayTitleStatus == 0 then
             if entry.timestamp ~= nil then
-                topListTime = topListTime .. " ".. date("%Y-%m-%d %H:%M", entry.timestamp) .."\n"
+                topListTime = topListTime .. " " .. date("%Y-%m-%d %H:%M", entry.timestamp) .. "\n"
             else
                 topListTime = topListTime .. " some time ago\n"
             end
         end
     end
 
+    topList.tableArea = CreateFrame("Frame", nil, topList)
+    topList.tableArea:ClearAllPoints()
+    topList.tableArea:SetPoint("TOPLEFT", topList.subtitle, "BOTTOMLEFT", 0, -10)
+    topList.tableArea:SetPoint("BOTTOMRIGHT", topList.contentArea, "BOTTOMRIGHT", 0, 0)
+
     local offset = 10
 
-    topListText_time:SetText(topListTime)
-    local timeWidth = topListText_time:GetStringWidth()
-    topListText_time:SetPoint("TOPRIGHT", topListFrame, -offset, -10)
+    topList.times:SetText(topListTime)
+    local timeWidth = topList.times:GetStringWidth()
+    topList.times:SetPoint("TOPRIGHT", topList.tableArea, "TOPRIGHT", -10, 0)
     offset = offset + timeWidth
 
-    topListText_Lvl:SetText(topListLvl)
-    local lvlWidth = topListText_Lvl:GetStringWidth()
-    topListText_Lvl:SetPoint("TOPRIGHT", topListFrame, -offset, -10)
+    topList.Lvl:SetText(topListLvl)
+    local lvlWidth = topList.Lvl:GetStringWidth()
+    topList.Lvl:SetPoint("TOPRIGHT", topList.tableArea, "TOPRIGHT", -offset, 0)
     offset = offset + lvlWidth
 
-    topListText_Lvllabel:SetText(topListLvllabel)
-    local lvllabelWidth = topListText_Lvllabel:GetStringWidth()
-    topListText_Lvllabel:SetPoint("TOPRIGHT", topListFrame, -offset, -10)
+    topList.Lvllabel:SetText(topListLvllabel)
+    local lvllabelWidth = topList.Lvllabel:GetStringWidth()
+    topList.Lvllabel:SetPoint("TOPRIGHT", topList.tableArea, "TOPRIGHT", -offset, 0)
     offset = offset + lvllabelWidth
 
-    topListText_HP:SetText(topListHP)
-    local hpWidth = topListText_HP:GetStringWidth()
-    topListText_HP:SetPoint("TOPRIGHT", topListFrame, -offset, -10)
+    topList.HP:SetText(topListHP)
+    local hpWidth = topList.HP:GetStringWidth()
+    topList.HP:SetPoint("TOPRIGHT", topList.tableArea, "TOPRIGHT", -offset, 0)
     offset = offset + hpWidth
 
-    topListText_indexes:SetText(topListIndexes)
-    local indexesWidth = topListText_indexes:GetStringWidth()
-    topListText_indexes:SetPoint("TOPRIGHT", topListFrame, -offset, -10)
+    topList.indexes:SetText(topListIndexes)
+    local indexesWidth = topList.indexes:GetStringWidth()
+    topList.indexes:SetPoint("TOPRIGHT", topList.tableArea, "TOPRIGHT", -offset, 0)
     offset = offset + indexesWidth
 
-    local totalWidth = offset-10 + 10 + 10
-    local totalheight = topListText_indexes:GetStringHeight() + 20
-    
-    topListFrame:ClearAllPoints()
-    topListFrame:SetWidth(totalWidth)
-    topListFrame:SetHeight(totalheight)
+    local totalWidth = offset - 10 + 10 + 10
+    table.insert(widths, totalWidth)
+    local totalheight = topList.indexes:GetStringHeight() + 30 + topList.title:GetHeight() + topList.subtitle:GetHeight()
 
-    local position_y = frame:GetTop()
-    local y_offset = 5
-
-    topListFrame:SetPoint("TOPRIGHT", frame, "BOTTOMRIGHT", 0, -y_offset)
-
-    local bottomY = position_y + y_offset - totalheight
-    local borderClearance = 10
-
-    if bottomY < borderClearance then    
-        topListFrame:ClearAllPoints()
-        topListFrame:SetPoint("BOTTOMRIGHT", frame, "TOPRIGHT", 0, y_offset)
-        topListFrame:SetWidth(totalWidth)
-        topListFrame:SetHeight(totalheight)
-    end
-
+    topList:ClearAllPoints()
+    topList:SetWidth(math.max(unpack(widths)) + 20)
+    topList:SetHeight(totalheight)
 end
 
-local mouseStart = {
-    x = 0,
-    y = 0
-}
-local clickDistanceTreshold = 5
+topList:SetMovable(true)
+topList:EnableMouse(true)
 
-frame:SetScript("OnMouseDown", function(self, button)
+topList:SetScript("OnDragStart", function(self, button)
+    self:StartMoving()
+end)
+
+topList:SetScript("OnDragStop", function(self, button)
+    self:StopMovingOrSizing()
+end)
+
+NDE.topList = NDE.topList or {}
+
+textDisplay:SetScript("OnMouseDown", function(self, button)
     if IsControlKeyDown() then
         self:StartMoving()
-    end
-    if IsAltKeyDown() then
-        mouseStart.x, mouseStart.y = self:GetCenter()
+
+    elseif button == "RightButton" then
+        local catID = NDE.options:updateOptionsScreen()
+        Settings.OpenToCategory(catID)
+
+    elseif button == "LeftButton" then
+        if NDE.topList.frame:IsShown() then
+            NDE.topList.frame:Hide()
+            return
+        end
+        NDE.topList:updateTopList()
+        NDE.topList.frame:Show()
     end
 end)
 
-frame:SetScript("OnMouseUp", function(self, button)
+textDisplay:SetScript("OnMouseUp", function(self, button)
     self:StopMovingOrSizing()
-    if IsAltKeyDown() then
-        local mouseEnd = {
-            x = 0,
-            y = 0
-        }
-        mouseEnd.x, mouseEnd.y = self:GetCenter()
-        local delta_x = mouseStart.x - mouseEnd.x
-        local delta_y = mouseStart.y - mouseEnd.y
-        if (delta_x * delta_x + delta_y * delta_y) < clickDistanceTreshold * clickDistanceTreshold then
-            NearDeathExperienceSetup.displayTitleStatus = (NearDeathExperienceSetup.displayTitleStatus + 1) % 3
-            local lowscore = NDE.helperFunctions:getLowestEntry(NearDeathExperienceScores)
-            displayScore(lowscore)
+end)
+
+textDisplay:SetScript("OnEnter", function(self, button)
+    NDE.gametooltip:setGameTooltip(self, 5)
+end)
+
+textDisplay:SetScript("OnLeave", function(self, button)
+    GameTooltip:Hide()
+end)
+
+textDisplay:SetScript("OnDragStop", function(self, button)
+    self:StopMovingOrSizing()
+end)
+
+local events = {}
+
+function events:UNIT_AURA()
+    NDE:AnchorNDEIcon()
+end
+
+function events:UNIT_INVENTORY_CHANGED()
+    NDE:AnchorNDEIcon()
+end
+
+function events:BAG_UPDATE_DELAYED()
+    NDE:AnchorNDEIcon()
+end
+
+function events:PLAYER_EQUIPMENT_CHANGED()
+    NDE:AnchorNDEIcon()
+end
+
+function events:PLAYER_REGEN_DISABLED()
+    test = NDE.helper:sampleValues()
+    testInCombat = true
+end
+
+function events:PLAYER_REGEN_ENABLED()
+    testInCombat = false
+    if not UnitIsDead("player") and (test.health < test.maxhp) then
+        test.timestamp = time()
+        NDE.helper:addEntry(NearDeathExperienceSessionScores, test)
+        local place = NDE.helper:addEntry(NearDeathExperienceScores, test)
+        if place == 1 then
+            NDE.helper:formattedChatEntry(test, "new Lowscore")
+            NDE:updateIcon((test.health / test.maxhp) * 100)
+            NDE.animations.icon:onNewRecord(iconFrame)
+            NDE:displayScore(test)
+        end
+        NDE.topList:updateTopList()
+    end
+end
+
+function events:PLAYER_DEAD()
+    testInCombat = false
+    test = NDE.helper:sampleValues()
+    test.timestamp = time()
+    NDE.helper:addEntry(NearDeathExperienceSessionScores, test)
+    NDE.helper:addEntry(NearDeathExperienceScores, test)
+
+    NearDeathExperienceScores = { entries = {}, maxEntries = NearDeathExperienceScores.maxEntries or 10 }
+end
+
+function events:UNIT_HEALTH(...)
+    local unit = ...
+    if testInCombat == true and unit == "player" then
+        local liveSample = NDE.helper:sampleValues()
+        if test.health == nil or (liveSample.health / liveSample.maxhp) < (test.health / test.maxhp) then
+            test = liveSample
         end
     end
-    updateTopList()
-end)
-
-frame:SetScript("OnEnter", function(self, button)
-    topListFrame:Show()
-    updateTopList()
-end)
-
-frame:SetScript("OnLeave", function(self, button)
-    topListFrame:Hide()
-end)
-
-frame:SetScript("OnDragStop", function(self, button)
-    self:StopMovingOrSizing()
-    updateTopList()
-end)
-
-frame:SetScript("OnEvent", function(self, event, ...)
-    events[event](self, ...)
-end)
-
-for k, v in pairs(events) do
-    frame:RegisterEvent(k)
 end
+
+function events:PLAYER_ENTERING_WORLD(...)
+    local isInitialLogin, isReloadingUI = ...
+
+    if isInitialLogin == true then
+        NearDeathExperienceSessionScores = { entries = {}, maxEntries = 3 }
+        print("|cffFF8888[NDE]|r |cff00ff00session scores|r reset.")
+
+    elseif isReloadingUI == true then
+        print("|cffFF8888[NDE]|r |cff00ff00UI reloaded|r.")
+    end
+
+    NearDeathExperienceSetup.displayFunction = NearDeathExperienceSetup.displayFunction or "buff"
+    NearDeathExperienceSetup.textSize = NearDeathExperienceSetup.textSize or 18
+    NearDeathExperienceSetup.textBgOpacity = NearDeathExperienceSetup.textBgOpacity or 0.5
+    NearDeathExperienceSetup.iconTextAbove = NearDeathExperienceSetup.iconTextAbove or false
+
+    NearDeathExperienceScores = NDE.helper:repairScoresTable(NearDeathExperienceScores)
+    NearDeathExperienceSessionScores = NDE.helper:repairScoresTable(NearDeathExperienceSessionScores, 3)
+
+    NDE:updateDisplayText()
+    NDE:setTextBgOpacity()
+
+    local lowscore = NDE.helper:getLowestEntry(NearDeathExperienceScores)
+    if lowscore ~= nil then
+        NDE.helper:formattedChatEntry(lowscore, "Lowscore")
+        NDE:displayScore(lowscore)
+        NDE:updateIcon(lowscore and lowscore.health and lowscore.maxhp and (lowscore.health / lowscore.maxhp * 100) or nil)
+    else
+        NDE:displayScore(nil)
+        NDE:updateIcon(nil)
+    end
+
+    NDE.options:updateOptionsScreen()
+    NDE:AnchorNDEIcon()
+    NDE.topList:updateTopList()
+end
+
+local eventFrame = CreateFrame("Frame")
+
+for k, _ in pairs(events) do
+    eventFrame:RegisterEvent(k)
+end
+
+eventFrame:SetScript("OnEvent", function(self, event, ...)
+    if events[event] then
+        events[event](self, ...)
+    end
+end)
